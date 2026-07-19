@@ -32,7 +32,7 @@ typedef enum Op {
 	WORD
 } Op;
 
-struct Register registers[2][8] = {
+static struct Register registers[2][8] = {
 	/* byte */
 	{
 		[0x00] = { .name = "al" },
@@ -53,7 +53,7 @@ struct Register registers[2][8] = {
 	}
 };
 
-struct Opcode opcodes[] = {
+static struct Opcode opcodes[] = {
 	[0x22]	 = { .instruction = "mov", .trailing_bytes = 1 }
 };
 
