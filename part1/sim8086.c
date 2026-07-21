@@ -64,9 +64,9 @@ typedef enum EAC
 	BP_DI_16,
 	SI_16,
 	DI_16,
-	BP_16
+	BP_16,
 	BX_16
-};
+} EAC;
 
 static Opcode opcodes[] = {
 	[0x22]	 = OP_MOV_REG_MEM_TO_FROM_REG, 
