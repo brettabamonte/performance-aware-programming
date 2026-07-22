@@ -21,14 +21,47 @@
 static const char *err_msg = "Issue parsing binary\n";
 typedef unsigned char u8;
 
-struct Register {
+#if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
+	typedef unsigned long u32;
+#elif defined(__APPLE__) || defined(__MACH__)
+	typedef unsigned int u32;
+#endif
+
+struct Register
+{
 	char *name;
 };
 
-typedef enum Op {
+typedef enum EacOperandType
+{
+	EOT_REGISTER,
+	EOT_DISPLACEMENT,
+	EOT_DIRECT_ADDRESS,
+	EOT_NULL
+} EacOperandType;
+
+typedef enum Op
+{
 	BYTE,
 	WORD
 } Op;
+
+typedef enum Displacement
+{
+	D8,
+	D16
+} Displacement;
+
+struct EacOperand
+{
+	EacOperandType type;
+	union
+	{
+		struct Register reg;
+		Displacement displacement;
+	} data;
+
+} EacOperand;
 
 typedef enum Opcode
 {
@@ -68,7 +101,7 @@ typedef enum EAC
 	BX_16
 } EAC;
 
-static Opcode opcodes[] = {
+static const Opcode opcodes[] = {
 	[0x22]	 = OP_MOV_REG_MEM_TO_FROM_REG, 
 	[0x63]   = OP_MOV_IMM_TO_REG_REM,
 	[0x0B]	 = OP_MOV_IMM_TO_REG,
@@ -77,7 +110,7 @@ static Opcode opcodes[] = {
 };
 
 /* See page 4-20 of 8086 manual for register/memory field encoding */
-static struct Register registers[2][8] = {
+static const struct Register registers[2][8] = {
 	/* byte */
 	{
 		[0x00] = { .name = "al" },
@@ -98,7 +131,7 @@ static struct Register registers[2][8] = {
 	}
 };
 
-EAC eac_lookup[3][8] = {
+static const EAC eac_lookup[3][8] = {
 	{
 		[0x00] = BX_SI,
 		[0x01] = BX_DI,
@@ -129,8 +162,66 @@ EAC eac_lookup[3][8] = {
 		[0x06] = BP_16,
 		[0x07] = BX_16
 	}
-	
 };
+
+struct eac_calc_exp {
+	struct EacOperand operand_1;
+	struct EacOperand operand_2;
+	struct EacOperand operand_3;
+} eac_calc;
+
+/* Using designated init for readibility only.
+   Maps EAC to the operands of the calculation
+   I don't like setting displacement to zero for EOT_NULL but the tag is what counts
+*/
+static const struct eac_calc_exp eac_calc_lookup[] = {
+	[BX_SI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } }, 
+	[BX_DI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BP_SI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BP_DI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[SI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_2 = { .type = EOT_NULL, .data = { .displacement = 0 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[DI]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_2 = { .type = EOT_NULL, .data = { .displacement = 0 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[DA]		= { .operand_1 = { .type = EOT_DIRECT_ADDRESS, .data = { .displacement = 0 } },
+					.operand_2 = { .type = EOT_NULL, .data = { .displacement = 0 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BX]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_NULL, .data = { .displacement = 0 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } }
+	//[BX_SI_8]	=
+	//[BX_DI_8]	=
+	//[BP_SI_8]	=
+	//[BP_DI_8]	=
+	//[SI_8]		=
+	//[DI_8]		=
+	//[BP_8]		=
+	//[BX_8]		=
+	//[BX_SI_16]	=
+	//[BX_DI_16]	=
+	//[BP_SI_16]	=
+	//[BP_DI_16]	=
+	//[SI_16]		=
+	//[DI_16]		=
+	//[BP_16]		=
+	//[BX_16]		=
+};
+
+/* Parses the EAC expr */
+void perform_eac(struct eac_calc_exp expr)
+{
+	//TODO (brett): implement		
+}
 
 //TODO (brett): we need a better way to check the opcode prefixes
 Opcode extract_opcode(u8 byte) 
@@ -222,13 +313,13 @@ u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode, long offset, long 
 
 			switch (mode)
 			{
-				case 0x00:
 				case 0x03:
 					{
 						struct Register src_rm = direction == 0 ? get_register(op, reg) : get_register(op, rm);
 						struct Register dest_rm = direction == 0 ? get_register(op, rm) : get_register(op, reg);
 						printf("mov %s, %s\n", dest_rm.name, src_rm.name);
 					}
+				case 0x00:
 				case 0x01:
 				case 0x02:
 				default:
