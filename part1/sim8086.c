@@ -198,23 +198,55 @@ static const struct eac_calc_exp eac_calc_lookup[] = {
 					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
 	[BX]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
 					.operand_2 = { .type = EOT_NULL, .data = { .displacement = 0 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BX_SI_8]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } } },
+	[BX_DI_8]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } } },
+	[BP_SI_8]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } } },
+	[BP_DI_8]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } } },
+	[SI_8]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[DI_8]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BP_8]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BX_8]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D8 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BX_SI_16]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } } },
+	[BX_DI_16]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } } },
+	[BP_SI_16]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } } },
+	[BP_DI_16]	= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_3 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } } },
+	[SI_16]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][6] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[DI_16]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][7] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BP_16]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][5] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } },
+					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } },
+	[BX_16]		= { .operand_1 = { .type = EOT_REGISTER, .data = { .reg = registers[1][3] } },
+					.operand_2 = { .type = EOT_DISPLACEMENT, .data = { .displacement = D16 } },
 					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } }
-	//[BX_SI_8]	=
-	//[BX_DI_8]	=
-	//[BP_SI_8]	=
-	//[BP_DI_8]	=
-	//[SI_8]		=
-	//[DI_8]		=
-	//[BP_8]		=
-	//[BX_8]		=
-	//[BX_SI_16]	=
-	//[BX_DI_16]	=
-	//[BP_SI_16]	=
-	//[BP_DI_16]	=
-	//[SI_16]		=
-	//[DI_16]		=
-	//[BP_16]		=
-	//[BX_16]		=
 };
 
 /* Parses the EAC expr */
