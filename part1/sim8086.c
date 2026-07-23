@@ -251,33 +251,49 @@ static const struct eac_calc_exp eac_calc_lookup[] = {
 					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } }
 };
 
-u8 eval_eac_operand(struct EacOperand operand, FILE *binary)
+u8 eval_eac_operand(struct EacOperand operand, struct EacOperand *prev_operand, FILE *binary)
 {
 	u16			*buffer;
 	size_t 		ret;
+	
 	switch(operand.type)
 	{
 		case EOT_NULL:
 			break;
 		case EOT_REGISTER:
+			if (prev_operand != NULL)
+				printf(" + ");
+
 			printf("%s", operand.data.reg.name);
 			break;
 		case EOT_DISPLACEMENT:
 			{
 				size_t n_bytes = operand.data.displacement == D16 ? 2 : 1;
-				ret = fread(buffer, n_bytes, n_bytes, binary); 
+				ret = fread(buffer, 1, n_bytes, binary); 
 				if (ret != n_bytes)
 					return 1; /* TODO (brett): better error handling */
+			
+				/* When displacement is 0 the assembly doesnt include it but the binary encodes it. dont print 0 offset */
+				if (*buffer == 0)
+					break;
+
+				if (prev_operand != NULL)
+					printf(" + ");
+
 				if (n_bytes == 1)
-					printf("%hhu", (u8)(*buffer));
+					printf("%hhu", (u8)*buffer);
 				else
 					printf("%hu", *buffer); /* 16 bit value */
 				break;
 			}
 		case EOT_DIRECT_ADDRESS:
-			ret = fread(buffer, 2, 2, binary); 
-			if (ret != 2)
+			if (prev_operand != NULL)
+				printf(" + ");
+
+			ret = fread(buffer, 1, 2, binary); 
+			if (ret != 2) {
 				return 1; /* TODO (brett): better error handling */
+			}
 			printf("%hu", *buffer);
 			break;
 		default:
@@ -289,12 +305,15 @@ u8 eval_eac_operand(struct EacOperand operand, FILE *binary)
 /* Parses the EAC expr. Return val 0 = success, 1 = fail */
 u8 eval_eac(struct eac_calc_exp expr, FILE* binary)
 {
+	struct EacOperand	*prev = NULL;
 	printf("[");
-	if (eval_eac_operand(expr.operand_1, binary) != 0)
+	if (eval_eac_operand(expr.operand_1, prev, binary) != 0)
 		return 1;
-	if (eval_eac_operand(expr.operand_2, binary) != 0)
+	prev = &(expr.operand_1);
+	if (eval_eac_operand(expr.operand_2, prev, binary) != 0)
 		return 1;
-	if (eval_eac_operand(expr.operand_3, binary) != 0)
+	prev = &(expr.operand_2);
+	if (eval_eac_operand(expr.operand_3, prev, binary) != 0)
 		return 1;
 	printf("]");
 	return 0;
@@ -392,14 +411,37 @@ u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode)
 			{
 				case 0x03:
 					{
-						struct Register src_rm = direction == 0 ? get_register(op, reg) : get_register(op, rm);
-						struct Register dest_rm = direction == 0 ? get_register(op, rm) : get_register(op, reg);
-						printf("mov %s, %s\n", dest_rm.name, src_rm.name);
+						struct Register src = direction == 0 ? get_register(op, reg) : get_register(op, rm);
+						struct Register dest = direction == 0 ? get_register(op, rm) : get_register(op, reg);
+						printf("mov %s, %s\n", dest.name, src.name);
 						break;
 					}
 				case 0x00:
 				case 0x01:
 				case 0x02:
+					{
+						/* Memory mode, no displacement */
+						printf("mov ");
+						struct eac_calc_exp 	expr;
+						struct Register 		r;
+
+						r = get_register(op, reg);
+
+						if (direction == 0) {
+							struct eac_calc_exp expr = eac_calc_lookup[eac_lookup[mode][rm]];
+							if (eval_eac(expr, binary) != 0)
+								return -1;
+							printf(", %s", r.name);
+							
+						} else {
+							printf("%s, ", r.name);
+							struct eac_calc_exp expr = eac_calc_lookup[eac_lookup[mode][rm]];
+							if (eval_eac(expr, binary) != 0)
+								return -1;
+						}
+						printf("\n");
+						break;
+					}
 				default:
 					return -1; /* TODO (brett): better error handling */
 			}
