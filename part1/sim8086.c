@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define BUF_SIZE 6
 
@@ -20,6 +21,7 @@
 
 static const char *err_msg = "Issue parsing binary\n";
 typedef unsigned char u8;
+typedef uint16_t u16;
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
 	typedef unsigned long u32;
@@ -35,7 +37,7 @@ struct Register
 typedef enum EacOperandType
 {
 	EOT_REGISTER,
-	EOT_DISPLACEMENT,
+	EOT_DISPLACEMENT, /* 16-bit displacement follows */
 	EOT_DIRECT_ADDRESS,
 	EOT_NULL
 } EacOperandType;
@@ -249,10 +251,53 @@ static const struct eac_calc_exp eac_calc_lookup[] = {
 					.operand_3 = { .type = EOT_NULL, .data = { .displacement = 0 } } }
 };
 
-/* Parses the EAC expr */
-void perform_eac(struct eac_calc_exp expr)
+u8 eval_eac_operand(struct EacOperand operand, FILE *binary)
 {
-	//TODO (brett): implement		
+	u16			*buffer;
+	size_t 		ret;
+	switch(operand.type)
+	{
+		case EOT_NULL:
+			break;
+		case EOT_REGISTER:
+			printf("%s", operand.data.reg.name);
+			break;
+		case EOT_DISPLACEMENT:
+			{
+				size_t n_bytes = operand.data.displacement == D16 ? 2 : 1;
+				ret = fread(buffer, n_bytes, n_bytes, binary); 
+				if (ret != n_bytes)
+					return 1; /* TODO (brett): better error handling */
+				if (n_bytes == 1)
+					printf("%hhu", (u8)(*buffer));
+				else
+					printf("%hu", *buffer); /* 16 bit value */
+				break;
+			}
+		case EOT_DIRECT_ADDRESS:
+			ret = fread(buffer, 2, 2, binary); 
+			if (ret != 2)
+				return 1; /* TODO (brett): better error handling */
+			printf("%hu", *buffer);
+			break;
+		default:
+			return 1;
+	}
+	return 0;
+}
+
+/* Parses the EAC expr. Return val 0 = success, 1 = fail */
+u8 eval_eac(struct eac_calc_exp expr, FILE* binary)
+{
+	printf("[");
+	if (eval_eac_operand(expr.operand_1, binary) != 0)
+		return 1;
+	if (eval_eac_operand(expr.operand_2, binary) != 0)
+		return 1;
+	if (eval_eac_operand(expr.operand_3, binary) != 0)
+		return 1;
+	printf("]");
+	return 0;
 }
 
 //TODO (brett): we need a better way to check the opcode prefixes
@@ -322,7 +367,7 @@ struct Register get_register(u8 op, u8 reg)
 	return registers[op][reg];
 }
 
-u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode, long offset, long pos)
+u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode)
 {
 	u8				direction, op, rv;
 	size_t			ret;
@@ -350,6 +395,7 @@ u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode, long offset, long 
 						struct Register src_rm = direction == 0 ? get_register(op, reg) : get_register(op, rm);
 						struct Register dest_rm = direction == 0 ? get_register(op, rm) : get_register(op, reg);
 						printf("mov %s, %s\n", dest_rm.name, src_rm.name);
+						break;
 					}
 				case 0x00:
 				case 0x01:
@@ -371,7 +417,6 @@ u8 parse_binary(FILE* binary)
 	u8 					buffer[BUF_SIZE];
 	u8					rv;
 	Opcode 				opcode;
-	long				offset, pos;
 	size_t				ret;
 
 	for(;;)
@@ -382,7 +427,7 @@ u8 parse_binary(FILE* binary)
 			return 0;
 		opcode = extract_opcode(*buffer);
 
-		if ((rv = parse_instruction(binary, buffer, opcode, offset, pos)) == 0)
+		if ((rv = parse_instruction(binary, buffer, opcode)) == 0)
 			return -1;
 	}
 	return 0;
