@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define BUF_SIZE 6
+#define BUF_SIZE 2
 
 #define OPCODE_4MASK 0xF0
 #define OPCODE_6MASK 0xFC
@@ -118,7 +118,8 @@ static const struct Register registers[2][8] = {
 		[0x00] = { .name = "al" },
 		[0x04] = { .name = "ah" },
 		[0x01] = { .name = "cl" },
-		[0x05] = { .name = "ch" }
+		[0x05] = { .name = "ch" },
+		[0x06] = { .name = "dh" }
 	},
 	/* word */
 	{
@@ -273,17 +274,24 @@ u8 eval_eac_operand(struct EacOperand operand, struct EacOperand *prev_operand, 
 				if (ret != n_bytes)
 					return 1; /* TODO (brett): better error handling */
 			
-				/* When displacement is 0 the assembly doesnt include it but the binary encodes it. dont print 0 offset */
-				if (*buffer == 0)
+				/* When displacement is 0 the assembly doesnt include it but the binary encodes it. dont print 0 offset. mask the lsb so left over buffer data doesn't cause issues */
+				if ((*buffer & 0xFF) == 0)
 					break;
-
+		
+				// TODO (brett): fix negative/positive logic		
+				int sign = -(*buffer < 0); /* 0 if pos, -1 if neg) */
 				if (prev_operand != NULL)
-					printf(" + ");
+				{
+					if (sign)
+						printf(" - ");
+					else
+						printf(" + ");
+				}
 
 				if (n_bytes == 1)
-					printf("%hhu", (u8)*buffer);
+					printf("%hhd", sign ? -((u8)*buffer) : (u8)*buffer);
 				else
-					printf("%hu", *buffer); /* 16 bit value */
+					printf("%hd", sign ? -(*buffer) : *buffer); /* 16 bit value */
 				break;
 			}
 		case EOT_DIRECT_ADDRESS:
@@ -445,13 +453,69 @@ u8 parse_instruction(FILE *binary, u8 *buffer, Opcode opcode)
 				default:
 					return -1; /* TODO (brett): better error handling */
 			}
-		case OP_MOV_IMM_TO_REG_REM:
+			break;
 		case OP_MOV_IMM_TO_REG:
+			printf("mov ");
+			op = ((*buffer) & 0x08) >> 3;
+			dest_rm = get_register(op, (*buffer) & 0x07);
+
+			printf("%s, ", dest_rm.name);
+
+			if (op == BYTE)
+			{
+				ret = fread(buffer, 1, 1, binary);
+				if (ret != 1)
+					return -1;
+				printf("%hhu\n", *buffer);	
+			} else {
+				ret = fread(buffer, 1, 2, binary);
+				if (ret != 2)
+					return -1;
+				printf("%hd\n", *buffer | (*(buffer + 1) << 8));	
+			}
+			break;
+		case OP_MOV_IMM_TO_REG_REM:
+			printf("mov ");
+			op = extract_op(*buffer);
+
+			ret = fread(buffer, 1, 1, binary); 
+			if (ret != 1)
+				return -1; /* TODO (brett): better error handling */
+			
+			mode = extract_mode(*buffer);
+			rm = extract_reg_mem(*buffer);
+
+			/* TODO (brett): poor api design where we are checking for the mode here. This should be opaque here */
+			if (mode == 0x00)
+			{
+				printf("%s, ", (get_register(op, rm)).name);	
+			} else {
+				struct eac_calc_exp expr = eac_calc_lookup[eac_lookup[mode][rm]];
+				if (eval_eac(expr, binary) != 0)
+					return -1;
+				printf(", ");
+			}		
+
+			/* Get the immediate */
+			if (op == BYTE)
+			{
+				ret = fread(buffer, 1, 1, binary);
+				if (ret != 1)
+					return -1;
+				printf("%hd\n", *buffer);	
+			} else {
+				ret = fread(buffer, 1, 2, binary);
+				if (ret != 2)
+					return -1;
+				printf("%hd\n", *buffer | (*(buffer + 1) << 8));
+			}
+			break;
 		case OP_MOV_MEM_TO_ACC:
 		case OP_MOV_ACC_TO_MEM:
 		default:
 			return -1;
 	}
+	return 0;
 }
 
 u8 parse_binary(FILE* binary)
@@ -469,7 +533,7 @@ u8 parse_binary(FILE* binary)
 			return 0;
 		opcode = extract_opcode(*buffer);
 
-		if ((rv = parse_instruction(binary, buffer, opcode)) == 0)
+		if ((rv = parse_instruction(binary, buffer, opcode)) != 0)
 			return -1;
 	}
 	return 0;
